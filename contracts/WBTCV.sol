@@ -17,6 +17,12 @@ contract WBTCV is ERC20Burnable, Ownable
         return true;
     }
 
+    function approve(address spender, uint256 amount) public override returns (bool) {
+        require(blocked[msg.sender] == false, 'User is blocked');
+        _approve(_msgSender(), spender, amount);
+        return true;
+    }
+
     function mint(address addr, uint256 amount) public onlyOwner{
         super._mint(addr, amount);
     }

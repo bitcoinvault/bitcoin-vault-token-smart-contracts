@@ -54,4 +54,24 @@ contract('WBTCV', (accounts) => {
     assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
   });
 
+  it('should not allow blocked user to make allowance', async () => {
+    const instance = await WBTCV.deployed();
+    await instance.blockUser(accounts[1])
+    await expectRevert(instance.approve(accounts[2], 1, {from: accounts[1]}), 'User is blocked');
+  });
+
+  it('should perform succesful transfer from allowance', async () => {
+    const instance = await WBTCV.deployed();
+    await instance.approve(accounts[1], 2, {from: accounts[0]});
+    allowance = await instance.allowance.call(accounts[0], accounts[1]);
+    assert.equal(web3.utils.toHex(allowance.valueOf()), web3.utils.toHex('2'), "2 wasn't the allowance");
+    await instance.transferFrom(accounts[0], accounts[2], 2, {from: accounts[1]})
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('5'), "5 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('2'), "2 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
+  });
+
 });
