@@ -90,7 +90,9 @@ contract WBTCV is ERC20Burnable, Ownable
         j = 0;
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
-            if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
+            if(alert.recipient == address(0))
+                continue;
+            else if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
             {
                 l_incomingAlerts[j] = alert;
                 j++;
@@ -113,6 +115,22 @@ contract WBTCV is ERC20Burnable, Ownable
                 delete incomingAlerts[addr][i];
                 if(i == incomingAlerts[addr].length - 1)
                     delete incomingAlerts[addr];
+            }
+        }
+    }
+
+    function cancelTransfers(address recipient) public{
+        require(recipient != address(0), "pushing alerts to 0 address!");
+        for (uint i = 0; i < incomingAlerts[recipient].length; i++) {
+            Alert storage alert = incomingAlerts[recipient][i];
+            if(alert.recipient == address(0))
+                continue;
+            else if(msg.sender == alert.cancelAccount)
+            {
+                _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
+                delete incomingAlerts[recipient][i];
+                if(i == incomingAlerts[recipient].length - 1)
+                    delete incomingAlerts[recipient];
             }
         }
     }

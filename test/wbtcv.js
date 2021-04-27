@@ -122,7 +122,34 @@ contract('WBTCV', (accounts) => {
     assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('4'), "4 wasn't the balance after transfer");
     assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
     assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
-
   });
+
+  it('should perform succesful cancellation of alert transfer', async () => {
+    const instance = await WBTCV.deployed();
+
+    await instance.transferAlert(accounts[1], 1, accounts[2]);
+
+    incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 1, "incoming alerts length not 1");
+    assert.equal(incomingAlerts[0].sender, accounts[0], "incoming alerts");
+    assert.equal(incomingAlerts[0].recipient, accounts[1], "incoming alerts");
+    assert.equal(incomingAlerts[0].amount, 1, "incoming alerts");
+    assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "incoming alerts");
+    assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), web3.utils.toHex(await time.latestBlock().valueOf()), "incoming alerts");
+
+    incomingAlerts = await instance.getReadyAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
+
+    for(i = 0; i < 5; i++)
+        await time.advanceBlock();
+
+    await instance.cancelTransfers(accounts[1], {from: accounts[2]})
+
+    incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 0, "incoming alerts length not 0");
+
+    incomingAlerts = await instance.getReadyAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
+    });
 
 });
