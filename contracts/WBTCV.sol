@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 struct Alert{
+    address sender;
     address recipient;
     uint256 amount;
     address cancelAccount;
@@ -61,12 +62,13 @@ contract WBTCV is ERC20Burnable, Ownable
         require(balanceOf(msg.sender) >= amount, "ERC20: transfer amount exceeds balance");
 
         _balancesLockedToAlerts[msg.sender] = _balancesLockedToAlerts[msg.sender] + amount;
-        incomingAlerts[recipient].push(Alert(recipient, amount, cancelAccount, block.number));
+        incomingAlerts[recipient].push(Alert(msg.sender, recipient, amount, cancelAccount, block.number));
 
         emit SentAlert(msg.sender, recipient, amount, cancelAccount);
     }
 
     function getIncomingAlerts(address addr) public view returns (Alert[] memory){
+        require(addr != address(0), "retrieving alerts for 0 address!");
         Alert[] memory l_incomingAlerts = new Alert[](incomingAlerts[addr].length);
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
@@ -76,15 +78,14 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function getReadyAlerts(address addr) public view returns (Alert[] memory){
+        require(addr != address(0), "retrieving alerts for 0 address!");
         uint j = 0;
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
             if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
                 j++;
         }
-        Alert[] memory l_incomingAlerts0;
-        if(j == 0)
-            return l_incomingAlerts0;
+
         Alert[] memory l_incomingAlerts = new Alert[](j);
         j = 0;
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
@@ -95,6 +96,24 @@ contract WBTCV is ERC20Burnable, Ownable
                 j++;
             }
         }
+
         return l_incomingAlerts;
+    }
+
+    function pushReadyAlerts(address addr) public{
+        require(addr != address(0), "pushing alerts to 0 address!");
+        for (uint i = 0; i < incomingAlerts[addr].length; i++) {
+            Alert storage alert = incomingAlerts[addr][i];
+            if(alert.recipient == address(0))
+                continue;
+            else if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
+            {
+                _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
+                _transfer(alert.sender, alert.recipient, alert.amount);
+                delete incomingAlerts[addr][i];
+                if(i == incomingAlerts[addr].length - 1)
+                    delete incomingAlerts[addr];
+            }
+        }
     }
 }

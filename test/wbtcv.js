@@ -95,6 +95,7 @@ contract('WBTCV', (accounts) => {
 
     incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 1, "incoming alerts length not 1");
+    assert.equal(incomingAlerts[0].sender, accounts[0], "incoming alerts");
     assert.equal(incomingAlerts[0].recipient, accounts[1], "incoming alerts");
     assert.equal(incomingAlerts[0].amount, 1, "incoming alerts");
     assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "incoming alerts");
@@ -102,14 +103,26 @@ contract('WBTCV', (accounts) => {
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
+
     for(i = 0; i < 240; i++)
         await time.advanceBlock();
+
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 1, "ready alerts length not 1");
+    assert.equal(incomingAlerts[0].sender, accounts[0], "ready alerts");
     assert.equal(incomingAlerts[0].recipient, accounts[1], "ready alerts");
     assert.equal(incomingAlerts[0].amount, 1, "ready alerts");
     assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "ready alerts");
     assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(240), "ready alerts");
+
+    await instance.pushReadyAlerts(accounts[1]);
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('4'), "4 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
+
   });
 
 });
