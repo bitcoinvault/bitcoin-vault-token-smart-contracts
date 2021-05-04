@@ -28,10 +28,6 @@ contract('WBTCV', (accounts) => {
     assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('10'), "10 wasn't the amount after burn");
   });
 
-  it('should not increase value after mint from not owner', async () => {
-    const instance = await WBTCV.deployed();
-    await expectRevert(instance.mint(accounts[0], 20, {from: accounts[1]}), 'Ownable: caller is not the owner');
-  });
 
   it('should perform succesful transfer', async () => {
     const instance = await WBTCV.deployed();
@@ -151,5 +147,13 @@ contract('WBTCV', (accounts) => {
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
     });
+
+/// OWNERSHIP FEATURE
+
+  it('should revert onlyOwner method calls from not owner', async () => {
+    const instance = await WBTCV.deployed();
+    await expectRevert(instance.mint(accounts[0], 20, {from: accounts[1]}), 'Ownable: caller is not the owner');
+    await expectRevert(instance.blockUser(accounts[0], {from: accounts[1]}), 'Ownable: caller is not the owner');
+  });
 
 });
