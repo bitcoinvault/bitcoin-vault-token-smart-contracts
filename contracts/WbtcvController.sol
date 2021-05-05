@@ -39,6 +39,10 @@ contract WbtcvController {
         return pendingMints.length;
     }
 
+    function getBurnsCount() public view returns (uint){
+        return pendingBurns.length;
+    }
+
     function removeFromPendingMints(uint i) private{
         require(i < pendingMints.length);
         if(pendingMints.length == 1)
@@ -49,7 +53,17 @@ contract WbtcvController {
         }
     }
 
-    function signMint(address addr, uint256 amount) public{
+    function removeFromPendingBurns(uint i) private{
+        require(i < pendingBurns.length);
+        if(pendingBurns.length == 1)
+            delete pendingBurns;
+        else{
+            pendingBurns[i] = pendingBurns[pendingBurns.length - 1];
+            pendingBurns.pop();
+        }
+    }
+
+    function signMint(address addr, uint256 amount) public onlySigner{
         for(uint i = 0; i < pendingMints.length; i++){
             if(addr == pendingMints[i].addr && amount == pendingMints[i].amount && msg.sender != pendingMints[i].addressSigned){
                 _ownedContract.mint(addr, amount);
@@ -60,7 +74,19 @@ contract WbtcvController {
     }
 
     function burn(uint256 amount) public{
-        _ownedContract.burn(amount);
+        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
+        pendingBurns.push(PendingBurn(amount, msg.sender));
+    }
+
+    function signBurn(uint256 amount) public onlySigner{
+        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
+        for(uint i = 0; i < pendingBurns.length; i++){
+            if(amount == pendingBurns[i].amount && msg.sender != pendingBurns[i].addressSigned){
+                _ownedContract.burn(amount);
+                removeFromPendingBurns(i);
+                break;
+            }
+        }
     }
 
     function blockUser(address userAddress) public{
