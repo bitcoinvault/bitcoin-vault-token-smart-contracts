@@ -59,6 +59,11 @@ contract('WbtcvController', (accounts) => {
     assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('20'), "mint target account balance should be 20 after mint proposal second signature");
   });
 
+  it('should reject signature of not proposed mint', async () => {
+      await wbtcv_controller.mint(wbtcv_controller.address, 20);
+      await expectRevert(wbtcv_controller.signMint(wbtcv_controller.address, 12, {from: accounts[8]}), "Mint proposal not present");
+  });
+
   it('should add pending burn proposal', async () => {
     await wbtcv_controller.mint(wbtcv_controller.address, 20);
     await wbtcv_controller.signMint(wbtcv_controller.address, 20, {from: accounts[8]});
@@ -97,7 +102,13 @@ contract('WbtcvController', (accounts) => {
       await wbtcv_controller.signBurn(12, {from: accounts[8]});
       balance = await wbtcv.balanceOf.call(wbtcv_controller.address);
       assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('8'), "balance should be 8 after burn");
-      await expectRevert(wbtcv_controller.burn(12), "Not enough funds to burn!");
+      await expectRevert(wbtcv_controller.burn(14), "Not enough funds to burn!");
   });
 
+  it('should reject signature of not proposed burn', async () => {
+      await wbtcv_controller.mint(wbtcv_controller.address, 20);
+      await wbtcv_controller.signMint(wbtcv_controller.address, 20, {from: accounts[8]});
+      await wbtcv_controller.burn(14);
+      await expectRevert(wbtcv_controller.signBurn(12, {from: accounts[8]}), "Burn proposal not present");
+  });
 });

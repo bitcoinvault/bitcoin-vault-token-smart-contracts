@@ -43,34 +43,15 @@ contract WbtcvController {
         return pendingBurns.length;
     }
 
-    function removeFromPendingMints(uint i) private{
-        require(i < pendingMints.length);
-        if(pendingMints.length == 1)
-            delete pendingMints;
-        else{
-            pendingMints[i] = pendingMints[pendingMints.length - 1];
-            pendingMints.pop();
-        }
-    }
-
-    function removeFromPendingBurns(uint i) private{
-        require(i < pendingBurns.length);
-        if(pendingBurns.length == 1)
-            delete pendingBurns;
-        else{
-            pendingBurns[i] = pendingBurns[pendingBurns.length - 1];
-            pendingBurns.pop();
-        }
-    }
-
     function signMint(address addr, uint256 amount) public onlySigner{
         for(uint i = 0; i < pendingMints.length; i++){
             if(addr == pendingMints[i].addr && amount == pendingMints[i].amount && msg.sender != pendingMints[i].addressSigned){
                 _ownedContract.mint(addr, amount);
-                removeFromPendingMints(i);
-                break;
+                delete pendingMints;
+                return;
             }
         }
+        revert("Mint proposal not present");
     }
 
     function burn(uint256 amount) public{
@@ -83,10 +64,11 @@ contract WbtcvController {
         for(uint i = 0; i < pendingBurns.length; i++){
             if(amount == pendingBurns[i].amount && msg.sender != pendingBurns[i].addressSigned){
                 _ownedContract.burn(amount);
-                removeFromPendingBurns(i);
-                break;
+                delete pendingBurns;
+                return;
             }
         }
+        revert("Burn proposal not present");
     }
 
     function blockUser(address userAddress) public{
