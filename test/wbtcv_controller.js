@@ -111,4 +111,29 @@ contract('WbtcvController', (accounts) => {
       await wbtcv_controller.burn(14);
       await expectRevert(wbtcv_controller.signBurn(12, {from: accounts[8]}), "Burn proposal not present");
   });
+
+  it('should transfer ownership of token contract', async () => {
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+      await wbtcv_controller.transferOwnership(accounts[5]);
+      await wbtcv_controller.signTransferOwnership(accounts[5], {from: accounts[8]});
+      assert.equal(await wbtcv.owner.call(), accounts[5]);
+  });
+
+  it('should reject ownership transfer proposal from not signer', async () => {
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+      await expectRevert(wbtcv_controller.transferOwnership(accounts[5], {from: accounts[1]}), "Feature is only available for approved signers");
+  });
+
+  it('should reject signature attempt of ownership transfer proposal from not signer', async () => {
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+      await wbtcv_controller.transferOwnership(accounts[5]);
+      await expectRevert(wbtcv_controller.signTransferOwnership(accounts[5], {from: accounts[1]}), "Feature is only available for approved signers");
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+  });
+
+  it('should reject ownership transfer signature of not proposed change', async () => {
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+      await expectRevert(wbtcv_controller.signTransferOwnership(accounts[5], {from: accounts[8]}), "Ownership transfer proposal not present");
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+  });
 });

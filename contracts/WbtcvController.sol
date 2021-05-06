@@ -13,14 +13,20 @@ struct PendingBurn{
     address addressSigned;
 }
 
+struct PendingOwnershipChange{
+    address newOwner;
+    address addressSigned;
+}
+
 contract WbtcvController {
     WBTCV private _ownedContract;
     mapping(address => bool) private _signers;
     PendingMint[] public pendingMints;
     PendingBurn[] public pendingBurns;
+    PendingOwnershipChange[] public  pendingOwnershipChanges;
 
     modifier onlySigner() {
-        require(_signers[msg.sender] == true, "Minting is only available for approved signers");
+        require(_signers[msg.sender] == true, "Feature is only available for approved signers");
         _;
     }
 
@@ -54,7 +60,7 @@ contract WbtcvController {
         revert("Mint proposal not present");
     }
 
-    function burn(uint256 amount) public{
+    function burn(uint256 amount) public onlySigner{
         require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
         pendingBurns.push(PendingBurn(amount, msg.sender));
     }
@@ -71,11 +77,28 @@ contract WbtcvController {
         revert("Burn proposal not present");
     }
 
-    function blockUser(address userAddress) public{
+    function blockUser(address userAddress) public onlySigner{
         _ownedContract.blockUser(userAddress);
     }
 
-    function unblockUser(address userAddress) public{
+    function unblockUser(address userAddress) public onlySigner{
         _ownedContract.unblockUser(userAddress);
+    }
+
+    function transferOwnership(address newOwner) public onlySigner{
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        pendingOwnershipChanges.push(PendingOwnershipChange(newOwner, msg.sender));
+    }
+
+    function signTransferOwnership(address newOwner) public onlySigner{
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        for(uint i = 0; i < pendingOwnershipChanges.length; i++){
+            if(newOwner == pendingOwnershipChanges[i].newOwner){
+                _ownedContract.transferOwnership(newOwner);
+                delete pendingOwnershipChanges;
+                return;
+            }
+        }
+        revert("Ownership transfer proposal not present");
     }
 }
