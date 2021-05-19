@@ -12,12 +12,18 @@ struct Alert{
     uint blockNumber;
 }
 
+struct PendingRecoveringAddressChange{
+    uint blockNumber;
+    address newCancelAccount;
+}
+
 contract WBTCV is ERC20Burnable, Ownable
 {
     mapping(address => bool) public blocked;
     mapping(address => Alert[]) public incomingAlerts;
-    mapping (address => uint256) private _balancesLockedToAlerts;
-    mapping (address => address) public recoveryAddresses;
+    mapping(address => uint256) private _balancesLockedToAlerts;
+    mapping(address => address) public recoveringAddresses;
+    mapping(address => PendingRecoveringAddressChange) public pendingRecoveringAddressChange;
 
     uint public constant ALERT_BLOCK_WAIT = 240;
 
@@ -32,8 +38,8 @@ contract WBTCV is ERC20Burnable, Ownable
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {
         require(blocked[msg.sender] == false, 'User is blocked');
-        if(address(0) != recoveryAddresses[msg.sender])
-            _transferAlert(recipient, amount, recoveryAddresses[msg.sender]);
+        if(address(0) != recoveringAddresses[msg.sender])
+            _transferAlert(recipient, amount, recoveringAddresses[msg.sender]);
         else
             _transfer(_msgSender(), recipient, amount);
         return true;
@@ -65,12 +71,21 @@ contract WBTCV is ERC20Burnable, Ownable
         return super.balanceOf(account) - _balancesLockedToAlerts[account];
     }
 
-    function setRecoveryAddress(address newRecoveryAddress) public{
-        recoveryAddresses[msg.sender] = newRecoveryAddress;
+    function setNewRecoveringAddress(address newRecoveryAddress) public{
+        if(recoveringAddresses[msg.sender] == address(0))
+            recoveringAddresses[msg.sender] = newRecoveryAddress;
+        else pendingRecoveringAddressChange[msg.sender] = PendingRecoveringAddressChange({blockNumber: block.number, newCancelAccount: newRecoveryAddress});
     }
 
-    function deleteRecoveryAddress() public{
-        delete recoveryAddresses[msg.sender];
+    function confirmNewRecoveringAddress(address newRecoveryAddress) public{
+        require(pendingRecoveringAddressChange[msg.sender].blockNumber + ALERT_BLOCK_WAIT <= block.number, "recovering address change not ready");
+        require(pendingRecoveringAddressChange[msg.sender].newCancelAccount == newRecoveryAddress, "pending recovering address change for other address");
+        recoveringAddresses[msg.sender] = newRecoveryAddress;
+        delete pendingRecoveringAddressChange[msg.sender];
+    }
+
+    function deleteRecoveringAddress() public{
+        delete recoveringAddresses[msg.sender];
     }
 
     function _transferAlert(address recipient, uint256 amount, address cancelAccount) private{
@@ -118,7 +133,7 @@ contract WBTCV is ERC20Burnable, Ownable
         return l_incomingAlerts;
     }
 
-    function pushReadyAlerts(address addr) public{
+    function redeemReadyAlerts(address addr) public{
         require(addr != address(0), "pushing alerts to 0 address!");
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
