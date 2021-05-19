@@ -23,7 +23,11 @@ contract WBTCV is ERC20Burnable, Ownable
 
     event SentAlert(address sender, address recipient, uint256 amount, address cancelAccount);
 
-    constructor() ERC20("Wrapped Bitcoin Vault", "WBTCV") {
+    constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
+    }
+
+    function decimals() public view override returns (uint8) {
+        return 8;
     }
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {
