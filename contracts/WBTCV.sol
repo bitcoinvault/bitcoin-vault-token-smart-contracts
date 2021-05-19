@@ -17,6 +17,7 @@ contract WBTCV is ERC20Burnable, Ownable
     mapping(address => bool) public blocked;
     mapping(address => Alert[]) public incomingAlerts;
     mapping (address => uint256) private _balancesLockedToAlerts;
+    mapping (address => address) public recoveryAddresses;
 
     uint public constant ALERT_BLOCK_WAIT = 240;
 
@@ -27,7 +28,10 @@ contract WBTCV is ERC20Burnable, Ownable
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {
         require(blocked[msg.sender] == false, 'User is blocked');
-        _transfer(_msgSender(), recipient, amount);
+        if(address(0) != recoveryAddresses[msg.sender])
+            _transferAlert(recipient, amount, recoveryAddresses[msg.sender]);
+        else
+            _transfer(_msgSender(), recipient, amount);
         return true;
     }
 
@@ -57,7 +61,15 @@ contract WBTCV is ERC20Burnable, Ownable
         return super.balanceOf(account) - _balancesLockedToAlerts[account];
     }
 
-    function transferAlert(address recipient, uint256 amount, address cancelAccount) public{
+    function setRecoveryAddress(address newRecoveryAddress) public{
+        recoveryAddresses[msg.sender] = newRecoveryAddress;
+    }
+
+    function deleteRecoveryAddress() public{
+        delete recoveryAddresses[msg.sender];
+    }
+
+    function _transferAlert(address recipient, uint256 amount, address cancelAccount) private{
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(balanceOf(msg.sender) >= amount, "ERC20: transfer amount exceeds balance");
 
