@@ -37,7 +37,7 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {
-        require(blocked[msg.sender] == false, 'User is blocked');
+        require(!blocked[msg.sender], 'User is blocked');
         if(address(0) != recoveringAddresses[msg.sender])
             _transferAlert(recipient, amount, recoveringAddresses[msg.sender]);
         else
@@ -46,12 +46,12 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function approve(address spender, uint256 amount) public override returns (bool) {
-        require(blocked[msg.sender] == false, 'User is blocked');
+        require(!blocked[msg.sender], 'User is blocked');
         _approve(_msgSender(), spender, amount);
         return true;
     }
 
-    function mint(address addr, uint256 amount) public onlyOwner{
+    function mint(address addr, uint256 amount) external onlyOwner{
         super._mint(addr, amount);
     }
 
@@ -59,11 +59,11 @@ contract WBTCV is ERC20Burnable, Ownable
         super.burn(amount);
     }
 
-    function blockUser(address userAddress) public onlyOwner{
+    function blockUser(address userAddress) external onlyOwner{
         blocked[userAddress] = true;
     }
 
-    function unblockUser(address userAddress) public onlyOwner{
+    function unblockUser(address userAddress) external onlyOwner{
         blocked[userAddress] = false;
     }
 
@@ -77,7 +77,7 @@ contract WBTCV is ERC20Burnable, Ownable
         else pendingRecoveringAddressChange[msg.sender] = PendingRecoveringAddressChange({blockNumber: block.number, newCancelAccount: newRecoveryAddress});
     }
 
-    function setNewRecoveringAddress(address newRecoveryAddress) public{
+    function setNewRecoveringAddress(address newRecoveryAddress) external{
         require(newRecoveryAddress != address(0), "new recovering address should not be 0 (use deleteRecoveringAddress?)");
         _setNewRecoveringAddress(newRecoveryAddress);
     }
@@ -89,11 +89,11 @@ contract WBTCV is ERC20Burnable, Ownable
         delete pendingRecoveringAddressChange[msg.sender];
     }
 
-    function deleteRecoveringAddress() public{
+    function deleteRecoveringAddress() external{
         _setNewRecoveringAddress(address(0));
     }
 
-    function confirmDeleteRecoveringAddress() public{
+    function confirmDeleteRecoveringAddress() external{
         confirmNewRecoveringAddress(address(0));
     }
 
@@ -107,7 +107,7 @@ contract WBTCV is ERC20Burnable, Ownable
         emit SentAlert(msg.sender, recipient, amount, cancelAccount);
     }
 
-    function getIncomingAlerts(address addr) public view returns (Alert[] memory){
+    function getIncomingAlerts(address addr) external view returns (Alert[] memory){
         require(addr != address(0), "retrieving alerts for 0 address!");
         Alert[] memory l_incomingAlerts = new Alert[](incomingAlerts[addr].length);
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
@@ -117,7 +117,7 @@ contract WBTCV is ERC20Burnable, Ownable
         return l_incomingAlerts;
     }
 
-    function getReadyAlerts(address addr) public view returns (Alert[] memory){
+    function getReadyAlerts(address addr) external view returns (Alert[] memory){
         require(addr != address(0), "retrieving alerts for 0 address!");
         uint j = 0;
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
@@ -142,7 +142,7 @@ contract WBTCV is ERC20Burnable, Ownable
         return l_incomingAlerts;
     }
 
-    function redeemReadyAlerts(address addr) public{
+    function redeemReadyAlerts(address addr) external{
         require(addr != address(0), "pushing alerts to 0 address!");
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
@@ -159,7 +159,7 @@ contract WBTCV is ERC20Burnable, Ownable
         }
     }
 
-    function cancelTransfers(address recipient) public{
+    function cancelTransfers(address recipient) external{
         require(recipient != address(0), "pushing alerts to 0 address!");
         for (uint i = 0; i < incomingAlerts[recipient].length; i++) {
             Alert storage alert = incomingAlerts[recipient][i];

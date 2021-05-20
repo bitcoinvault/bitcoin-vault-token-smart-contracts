@@ -26,7 +26,7 @@ contract WbtcvController {
     PendingOwnershipChange[] public  pendingOwnershipChanges;
 
     modifier onlySigner() {
-        require(_signers[msg.sender] == true, "Feature is only available for approved signers");
+        require(_signers[msg.sender], "Feature is only available for approved signers");
         _;
     }
 
@@ -37,68 +37,86 @@ contract WbtcvController {
         _ownedContract = ownedContract;
     }
 
-    function mint(address addr, uint256 amount) public onlySigner{
+    function mint(address addr, uint256 amount) external onlySigner{
         pendingMints.push(PendingMint(addr, amount, msg.sender));
     }
 
-    function getMintsCount() public view returns (uint){
+    function getMintsCount() external view returns (uint){
         return pendingMints.length;
     }
 
-    function getBurnsCount() public view returns (uint){
+    function getBurnsCount() external view returns (uint){
         return pendingBurns.length;
     }
 
-    function signMint(address addr, uint256 amount) public onlySigner{
+    function _isMintSignatureCorrect(address addr, uint256 amount) private view returns (bool){
         for(uint i = 0; i < pendingMints.length; i++){
             if(addr == pendingMints[i].addr && amount == pendingMints[i].amount && msg.sender != pendingMints[i].addressSigned){
-                _ownedContract.mint(addr, amount);
-                delete pendingMints;
-                return;
+                return true;
             }
         }
-        revert("Mint proposal not present");
+        return false;
     }
 
-    function burn(uint256 amount) public onlySigner{
+    function signMint(address addr, uint256 amount) external onlySigner{
+        if(_isMintSignatureCorrect(addr, amount)){
+            delete pendingMints;
+            _ownedContract.mint(addr, amount);
+        }
+        else revert("Mint proposal not present");
+    }
+
+    function burn(uint256 amount) external onlySigner{
         require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
         pendingBurns.push(PendingBurn(amount, msg.sender));
     }
 
-    function signBurn(uint256 amount) public onlySigner{
-        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
+    function _isBurnSignatureCorrect(uint256 amount) private view returns(bool){
         for(uint i = 0; i < pendingBurns.length; i++){
             if(amount == pendingBurns[i].amount && msg.sender != pendingBurns[i].addressSigned){
-                _ownedContract.burn(amount);
-                delete pendingBurns;
-                return;
+                return true;
             }
         }
-        revert("Burn proposal not present");
+        return false;
     }
 
-    function blockUser(address userAddress) public onlySigner{
+    function signBurn(uint256 amount) external onlySigner{
+        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
+        if(_isBurnSignatureCorrect(amount)){
+            delete pendingBurns;
+            _ownedContract.burn(amount);
+        }
+        else revert("Burn proposal not present");
+    }
+
+    function blockUser(address userAddress) external onlySigner{
         _ownedContract.blockUser(userAddress);
     }
 
-    function unblockUser(address userAddress) public onlySigner{
+    function unblockUser(address userAddress) external onlySigner{
         _ownedContract.unblockUser(userAddress);
     }
 
-    function transferOwnership(address newOwner) public onlySigner{
+    function transferOwnership(address newOwner) external onlySigner{
         require(newOwner != address(0), "Ownable: new owner is the zero address");
         pendingOwnershipChanges.push(PendingOwnershipChange(newOwner, msg.sender));
     }
 
-    function signTransferOwnership(address newOwner) public onlySigner{
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+    function _isOwnershipTransferSignatureCorrect(address newOwner) private view returns (bool){
         for(uint i = 0; i < pendingOwnershipChanges.length; i++){
             if(newOwner == pendingOwnershipChanges[i].newOwner){
-                _ownedContract.transferOwnership(newOwner);
-                delete pendingOwnershipChanges;
-                return;
+                return true;
             }
         }
-        revert("Ownership transfer proposal not present");
+        return false;
+    }
+
+    function signTransferOwnership(address newOwner) external onlySigner{
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        if(_isOwnershipTransferSignatureCorrect(newOwner)){
+            delete pendingOwnershipChanges;
+            _ownedContract.transferOwnership(newOwner);
+        }
+        else revert("Ownership transfer proposal not present");
     }
 }
