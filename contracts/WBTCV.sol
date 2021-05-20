@@ -71,21 +71,30 @@ contract WBTCV is ERC20Burnable, Ownable
         return super.balanceOf(account) - _balancesLockedToAlerts[account];
     }
 
-    function setNewRecoveringAddress(address newRecoveryAddress) public{
+    function _setNewRecoveringAddress(address newRecoveryAddress) private{
         if(recoveringAddresses[msg.sender] == address(0))
             recoveringAddresses[msg.sender] = newRecoveryAddress;
         else pendingRecoveringAddressChange[msg.sender] = PendingRecoveringAddressChange({blockNumber: block.number, newCancelAccount: newRecoveryAddress});
     }
 
+    function setNewRecoveringAddress(address newRecoveryAddress) public{
+        require(newRecoveryAddress != address(0), "new recovering address should not be 0 (use deleteRecoveringAddress?)");
+        _setNewRecoveringAddress(newRecoveryAddress);
+    }
+
     function confirmNewRecoveringAddress(address newRecoveryAddress) public{
         require(pendingRecoveringAddressChange[msg.sender].blockNumber + ALERT_BLOCK_WAIT <= block.number, "recovering address change not ready");
-        require(pendingRecoveringAddressChange[msg.sender].newCancelAccount == newRecoveryAddress, "pending recovering address change for other address");
+        require(pendingRecoveringAddressChange[msg.sender].newCancelAccount == newRecoveryAddress, "no pending recovering address change for this address");
         recoveringAddresses[msg.sender] = newRecoveryAddress;
         delete pendingRecoveringAddressChange[msg.sender];
     }
 
     function deleteRecoveringAddress() public{
-        delete recoveringAddresses[msg.sender];
+        _setNewRecoveringAddress(address(0));
+    }
+
+    function confirmDeleteRecoveringAddress() public{
+        confirmNewRecoveringAddress(address(0));
     }
 
     function _transferAlert(address recipient, uint256 amount, address cancelAccount) private{

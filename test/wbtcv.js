@@ -13,6 +13,12 @@ contract('WBTCV', (accounts) => {
 
 /// TOKEN FEATURES
 
+  it('should have wBTCV name and 8 decimals precision', async () => {
+    assert.equal(await instance.name(), "Wrapped Bitcoin Vault", "name should be Wrapped Bitcoin Vault");
+    assert.equal(await instance.symbol(), "wBTCV", "symbol should be wBTCV");
+    assert.equal(await instance.decimals(), 8, "decimal precision should be 8")
+  });
+
   it('should have 0 coins as initial amount', async () => {
     balance = await instance.balanceOf.call(accounts[0]);
     assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('0'), "0 wasn't in the first account");
@@ -131,15 +137,27 @@ contract('WBTCV', (accounts) => {
     for(i = 0; i < 240; i++)
         await time.advanceBlock();
 
-    await expectRevert(instance.confirmNewRecoveringAddress(accounts[2]), "pending recovering address change for other address");
+    await expectRevert(instance.confirmNewRecoveringAddress(accounts[2]), "no pending recovering address change for this address");
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
   });
 
-  it('should delete recovery address', async () => {
+  it('should delete recovery address after ALERT_BLOCK_WAIT blocks', async () => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
     await instance.deleteRecoveringAddress({from: accounts[0]});
+
+    for(i = 0; i < 240; i++)
+        await time.advanceBlock();
+
+    await instance.confirmDeleteRecoveringAddress();
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
+  });
+
+  it('should not delete recovery address before ALERT_BLOCK_WAIT blocks', async () => {
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
+    await instance.deleteRecoveringAddress({from: accounts[0]});
+    assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
   });
 
   it('should perform succesful transfer with alert', async () => {
@@ -230,6 +248,11 @@ contract('WBTCV', (accounts) => {
     await instance.mint(accounts[0], 10);
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.deleteRecoveringAddress({from: accounts[0]});
+
+    for(i = 0; i < 240; i++)
+        await time.advanceBlock();
+
+    await instance.confirmDeleteRecoveringAddress();
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
     balance0 = await instance.balanceOf.call(accounts[0]);
