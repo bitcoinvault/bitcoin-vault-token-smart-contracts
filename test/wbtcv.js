@@ -108,6 +108,12 @@ contract('WBTCV', (accounts) => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
   });
 
+  it('should not process recovery address change for zero address', async () => {
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await expectRevert(instance.setNewRecoveringAddress("0x0000000000000000000000000000000000000000", {from: accounts[0]}),
+        "new recovering address should not be 0 (use deleteRecoveringAddress?)");
+  });
+
   it('should not confirm recovery address before ALERT_BLOCK_WAIT blocks', async () => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
@@ -180,6 +186,52 @@ contract('WBTCV', (accounts) => {
     balance1 = await instance.balanceOf.call(accounts[1]);
     balance2 = await instance.balanceOf.call(accounts[2]);
     assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('9'), "9 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+  });
+
+  it('should revert if alert sent to zero address', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await expectRevert(instance.transfer("0x0000000000000000000000000000000000000000", 1, {from: accounts[0]}),
+        "ERC20: transfer to the zero address");
+  });
+
+  it('should revert when retrieving alerts for zero address', async () => {
+    await expectRevert(instance.getIncomingAlerts("0x0000000000000000000000000000000000000000"), "retrieving alerts for 0 address!");
+    await expectRevert(instance.getReadyAlerts("0x0000000000000000000000000000000000000000"), "retrieving alerts for 0 address!");
+  });
+
+  it('should revert when trying to cancel or redeem alert to zero address', async () => {
+    await expectRevert(instance.redeemReadyAlerts("0x0000000000000000000000000000000000000000"), "pushing alerts to 0 address!");
+    await expectRevert(instance.cancelTransfers("0x0000000000000000000000000000000000000000"), "pushing alerts to 0 address!");
+  });
+
+  it('should leave not ready alert when redeeming a ready one', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+
+    for(i = 0; i < 120; i++)
+        await time.advanceBlock();
+
+    await instance.transfer(accounts[1], 2, {from: accounts[0]});
+
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "7 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+
+    for(i = 0; i < 120; i++)
+        await time.advanceBlock();
+
+    await instance.redeemReadyAlerts(accounts[1]);
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "7 wasn't the balance after transfer");
     assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
     assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
   });
@@ -272,6 +324,86 @@ contract('WBTCV', (accounts) => {
     await instance.cancelTransfers(accounts[1], {from: accounts[2]})
     incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "incoming alerts length not 0");
+
+    incomingAlerts = await instance.getReadyAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
+  });
+
+  it('should cancel two alerts from different senders', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.mint(accounts[2], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.setNewRecoveringAddress(accounts[0], {from: accounts[2]});
+    await instance.transfer(accounts[1], 1, {from: accounts[2]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+
+    for(i = 0; i < 2; i++)
+        await time.advanceBlock();
+
+    await instance.cancelTransfers(accounts[1], {from: accounts[2]})
+    await instance.cancelTransfers(accounts[1], {from: accounts[0]})
+
+    for(i = 0; i < 240; i++)
+        await time.advanceBlock();
+
+    incomingAlerts = await instance.getReadyAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 0, "ready alerts length not 1");
+  });
+
+  it("should not cancel alert from other sender", async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.mint(accounts[2], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.setNewRecoveringAddress(accounts[0], {from: accounts[2]});
+    await instance.transfer(accounts[1], 1, {from: accounts[2]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+    await instance.transfer(accounts[1], 2, {from: accounts[2]});
+    await instance.transfer(accounts[1], 2, {from: accounts[0]});
+
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "8 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "8 wasn't the balance after transfer");
+
+    for(i = 0; i < 2; i++)
+        await time.advanceBlock();
+    await instance.cancelTransfers(accounts[1], {from: accounts[2]})
+
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('10'), "10 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "1 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "0 wasn't the balance after transfer");
+
+    for(i = 0; i < 240; i++)
+        await time.advanceBlock();
+
+    incomingAlerts = await instance.getReadyAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 2, "ready alerts length not 1");
+
+    await instance.redeemReadyAlerts(accounts[1]);
+    balance0 = await instance.balanceOf.call(accounts[0]);
+    balance1 = await instance.balanceOf.call(accounts[1]);
+    balance2 = await instance.balanceOf.call(accounts[2]);
+    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('10'), "9 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('3'), "1 wasn't the balance after transfer");
+    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "0 wasn't the balance after transfer");
+  });
+
+  it('should not perform cancellation if request is from other address', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+
+    for(i = 0; i < 2; i++)
+        await time.advanceBlock();
+
+    await instance.cancelTransfers(accounts[1], {from: accounts[3]})
+    incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
+    assert.equal(incomingAlerts.length, 1, "incoming alerts length not 1");
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
