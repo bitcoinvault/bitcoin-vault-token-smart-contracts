@@ -80,7 +80,6 @@ contract('WbtcvController', (accounts) => {
     const wbtcv_controller = await WbtcvController.deployed();
     await wbtcv_controller.mint(accounts[1], 5);
     await expectRevert(wbtcv_controller.burn(10), "Not enough funds to burn!");
-
   });
 
   it('should subtract burned amount if burn proposal signed by two', async () => {
@@ -112,6 +111,36 @@ contract('WbtcvController', (accounts) => {
       await expectRevert(wbtcv_controller.signBurn(12, {from: accounts[8]}), "Burn proposal not present");
   });
 
+  it('should block user if called by signer', async () => {
+      await wbtcv_controller.mint(accounts[1], 20);
+      await wbtcv_controller.signMint(accounts[1], 20, {from: accounts[8]});
+      await wbtcv_controller.blockUser(accounts[1], {from: accounts[8]});
+      await expectRevert(wbtcv.transfer(accounts[2], 10, {from: accounts[1]}), "User is blocked");
+  });
+
+  it('should not block user if not called by signer', async () => {
+      await wbtcv_controller.mint(accounts[1], 20);
+      await wbtcv_controller.signMint(accounts[1], 20, {from: accounts[8]});
+      await expectRevert(wbtcv_controller.blockUser(accounts[1], {from: accounts[7]}), "Feature is only available for approved signers");
+  });
+
+  it('should unblock user if called by signer', async () => {
+      await wbtcv_controller.mint(accounts[1], 20);
+      await wbtcv_controller.signMint(accounts[1], 20, {from: accounts[8]});
+      await wbtcv_controller.blockUser(accounts[1], {from: accounts[8]});
+      await wbtcv_controller.unblockUser(accounts[1], {from: accounts[8]});
+      await wbtcv.transfer(accounts[2], 2, {from: accounts[1]});
+      balance = await wbtcv.balanceOf.call(accounts[1]);
+      assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('18'), "18 wasn't the balance after transfer");
+  });
+
+  it('should not unblock user if not called by signer', async () => {
+      await wbtcv_controller.mint(accounts[1], 20);
+      await wbtcv_controller.signMint(accounts[1], 20, {from: accounts[8]});
+      await wbtcv_controller.blockUser(accounts[1], {from: accounts[8]});
+      await expectRevert(wbtcv_controller.unblockUser(accounts[1], {from: accounts[2]}), "Feature is only available for approved signers");
+  });
+
   it('should transfer ownership of token contract', async () => {
       assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
       await wbtcv_controller.transferOwnership(accounts[5]);
@@ -135,5 +164,18 @@ contract('WbtcvController', (accounts) => {
       assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
       await expectRevert(wbtcv_controller.signTransferOwnership(accounts[5], {from: accounts[8]}), "Ownership transfer proposal not present");
       assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+  });
+
+  it('should transfer ownership when other proposals present', async () => {
+      await wbtcv_controller.transferOwnership(accounts[4]);
+      await wbtcv_controller.transferOwnership(accounts[5]);
+      await wbtcv_controller.transferOwnership(accounts[6]);
+      await wbtcv_controller.signTransferOwnership(accounts[5], {from: accounts[8]});
+      assert.equal(await wbtcv.owner.call(), accounts[5]);
+  });
+
+  it('should reject ownership transfer proposal to zero address', async () => {
+      assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
+      await expectRevert(wbtcv_controller.transferOwnership("0x0000000000000000000000000000000000000000", {from: accounts[8]}), "Ownable: new owner is the zero address");
   });
 });

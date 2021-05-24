@@ -83,7 +83,6 @@ contract WbtcvController {
     }
 
     function signBurn(uint256 amount) external onlySigner{
-        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
         if(_isBurnSignatureCorrect(amount)){
             delete pendingBurns;
             _ownedContract.burn(amount);
@@ -114,7 +113,6 @@ contract WbtcvController {
     }
 
     function signTransferOwnership(address newOwner) external onlySigner{
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
         if(_isOwnershipTransferSignatureCorrect(newOwner)){
             delete pendingOwnershipChanges;
             _ownedContract.transferOwnership(newOwner);
