@@ -1,15 +1,27 @@
+const WbtcvTestable = artifacts.require("WbtcvTestable");
 const WBTCV = artifacts.require("WBTCV");
+
 const {
     time,
     expectRevert, // Assertions for transactions that should fail
 } = require('@openzeppelin/test-helpers');
 
-contract('WBTCV', (accounts) => {
+contract('WbtcvTestable', (accounts) => {
     let instance;
 
     beforeEach(async () => {
-        instance = await WBTCV.new();
+        instance = await WbtcvTestable.new();
     })
+
+    async function checkBalance(address, expectedBalance){
+        balance = await instance.balanceOf.call(address);
+        assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex(expectedBalance), "Incorrect balance, expected " + address + " to be " + expectedBalance);
+    }
+
+    async function wait_ALERT_BLOCK_WAIT_blocks(){
+        for(i = 0; i < await instance.ALERT_BLOCK_WAIT(); i++)
+            await time.advanceBlock();
+    }
 
 /// TOKEN FEATURES
 
@@ -19,31 +31,31 @@ contract('WBTCV', (accounts) => {
     assert.equal(await instance.decimals(), 8, "decimal precision should be 8")
   });
 
+  it('should wait 17280 blocks for alert transaction', async () => {
+    instance = await WBTCV.new();
+    assert.equal(await instance.ALERT_BLOCK_WAIT(), 17280, "ALERT_BLOCK_WAIT should be 17280 for WBTCV");
+  });
+
   it('should have 0 coins as initial amount', async () => {
-    balance = await instance.balanceOf.call(accounts[0]);
-    assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('0'), "0 wasn't in the first account");
+    await checkBalance(accounts[0], "0");
   });
 
   it('should increase value after mint', async () => {
     await instance.mint(accounts[0], 20);
-    balance = await instance.balanceOf.call(accounts[0]);
-    assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('20'), "20 wasn't the amount after mint");
+    await checkBalance(accounts[0], "20");
   });
 
   it('should decrease value after burn', async () => {
     await instance.mint(accounts[0], 20);
     await instance.burn(10);
-    balance = await instance.balanceOf.call(accounts[0]);
-    assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex('10'), "10 wasn't the amount after burn");
+    await checkBalance(accounts[0], "10");
   });
 
   it('should perform succesful transfer', async () => {
     await instance.mint(accounts[0], 20);
     await instance.transfer(accounts[1], 3);
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('17'), "17 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('3'), "3 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "17");
+    await checkBalance(accounts[1], "3");
   });
 
 /// BLOCKING FEATURE
@@ -58,10 +70,8 @@ contract('WBTCV', (accounts) => {
     await instance.mint(accounts[1], 3);
     await instance.unblockUser(accounts[1]);
     await instance.transfer(accounts[2], 1, {from: accounts[1]});
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('2'), "2 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
+    await checkBalance(accounts[1], "2");
+    await checkBalance(accounts[2], "1");
   });
 
   it('should not allow blocked user to make allowance', async () => {
@@ -76,12 +86,9 @@ contract('WBTCV', (accounts) => {
     allowance = await instance.allowance.call(accounts[0], accounts[1]);
     assert.equal(web3.utils.toHex(allowance.valueOf()), web3.utils.toHex('2'), "2 wasn't the allowance");
     await instance.transferFrom(accounts[0], accounts[2], 1, {from: accounts[1]})
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('9'), "9 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "9");
+    await checkBalance(accounts[1], "0");
+    await checkBalance(accounts[2], "1");
   });
 
 /// ALERT FEATURE
@@ -128,8 +135,7 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.setNewRecoveringAddress(accounts[3], {from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     await instance.confirmNewRecoveringAddress(accounts[3]);
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[3]);
@@ -140,8 +146,7 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.setNewRecoveringAddress(accounts[3], {from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     await expectRevert(instance.confirmNewRecoveringAddress(accounts[2]), "no pending recovering address change for this address");
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
@@ -152,8 +157,7 @@ contract('WBTCV', (accounts) => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
     await instance.deleteRecoveringAddress({from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     await instance.confirmDeleteRecoveringAddress();
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
@@ -170,24 +174,16 @@ contract('WBTCV', (accounts) => {
     await instance.mint(accounts[0], 10);
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
+    await checkBalance(accounts[0], "9");
+    await checkBalance(accounts[1], "0");
+    await checkBalance(accounts[2], "0");
 
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('9'), "9 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     await instance.redeemReadyAlerts(accounts[1]);
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('9'), "9 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "9");
+    await checkBalance(accounts[1], "1");
+    await checkBalance(accounts[2], "0");
   });
 
   it('should revert if alert sent to zero address', async () => {
@@ -212,28 +208,21 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    for(i = 0; i < 120; i++)
+    for(i = 0; i < 12; i++)
         await time.advanceBlock();
 
     await instance.transfer(accounts[1], 2, {from: accounts[0]});
+    await checkBalance(accounts[0], "7");
+    await checkBalance(accounts[1], "0");
+    await checkBalance(accounts[2], "0");
 
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "7 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-
-    for(i = 0; i < 120; i++)
+    for(i = 0; i < 12; i++)
         await time.advanceBlock();
 
     await instance.redeemReadyAlerts(accounts[1]);
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "7 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "7");
+    await checkBalance(accounts[1], "1");
+    await checkBalance(accounts[2], "0");
   });
 
   it('should list incoming alerts', async () => {
@@ -258,8 +247,7 @@ contract('WBTCV', (accounts) => {
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 1, "ready alerts length not 1");
@@ -267,7 +255,7 @@ contract('WBTCV', (accounts) => {
     assert.equal(incomingAlerts[0].recipient, accounts[1], "ready alerts");
     assert.equal(incomingAlerts[0].amount, 1, "ready alerts");
     assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "ready alerts");
-    assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(240), "ready alerts");
+    assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(24), "ready alerts");
   });
 
   it('should clean incoming alerts after ready alerts pushed', async () => {
@@ -275,8 +263,7 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     incomingAlerts = await instance.redeemReadyAlerts(accounts[1]);
     incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
@@ -288,8 +275,7 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     incomingAlerts = await instance.redeemReadyAlerts(accounts[1]);
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
@@ -301,16 +287,12 @@ contract('WBTCV', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.deleteRecoveringAddress({from: accounts[0]});
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     await instance.confirmDeleteRecoveringAddress();
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
-
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('9'), "9 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('1'), "1 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "9");
+    await checkBalance(accounts[1], "1");
   });
 
   it('should perform succesful cancellation of alert transfer', async () => {
@@ -343,8 +325,7 @@ contract('WBTCV', (accounts) => {
     await instance.cancelTransfers(accounts[1], {from: accounts[2]})
     await instance.cancelTransfers(accounts[1], {from: accounts[0]})
 
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 1");
@@ -359,38 +340,26 @@ contract('WBTCV', (accounts) => {
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
     await instance.transfer(accounts[1], 2, {from: accounts[2]});
     await instance.transfer(accounts[1], 2, {from: accounts[0]});
-
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('7'), "8 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "0 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "8 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "7");
+    await checkBalance(accounts[1], "0");
+    await checkBalance(accounts[2], "7");
 
     for(i = 0; i < 2; i++)
         await time.advanceBlock();
+
     await instance.cancelTransfers(accounts[1], {from: accounts[2]})
+    await checkBalance(accounts[0], "10");
+    await checkBalance(accounts[1], "0");
+    await checkBalance(accounts[2], "7");
 
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('10'), "10 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('0'), "1 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "0 wasn't the balance after transfer");
-
-    for(i = 0; i < 240; i++)
-        await time.advanceBlock();
+    await wait_ALERT_BLOCK_WAIT_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 2, "ready alerts length not 1");
-
     await instance.redeemReadyAlerts(accounts[1]);
-    balance0 = await instance.balanceOf.call(accounts[0]);
-    balance1 = await instance.balanceOf.call(accounts[1]);
-    balance2 = await instance.balanceOf.call(accounts[2]);
-    assert.equal(web3.utils.toHex(balance0.valueOf()), web3.utils.toHex('10'), "9 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance1.valueOf()), web3.utils.toHex('3'), "1 wasn't the balance after transfer");
-    assert.equal(web3.utils.toHex(balance2.valueOf()), web3.utils.toHex('7'), "0 wasn't the balance after transfer");
+    await checkBalance(accounts[0], "10");
+    await checkBalance(accounts[1], "3");
+    await checkBalance(accounts[2], "7");
   });
 
   it('should not perform cancellation if request is from other address', async () => {

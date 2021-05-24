@@ -27,8 +27,6 @@ contract WBTCV is ERC20Burnable, Ownable
     mapping(address => address) public recoveringAddresses;
     mapping(address => PendingRecoveringAddressChange) public pendingRecoveringAddressChange;
 
-    uint public constant ALERT_BLOCK_WAIT = 240;
-
     event SentAlert(address sender, address recipient, uint256 amount, address cancelAccount);
 
     constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
@@ -36,6 +34,10 @@ contract WBTCV is ERC20Burnable, Ownable
 
     function decimals() public view override returns (uint8) {
         return 8;
+    }
+
+    function ALERT_BLOCK_WAIT() public view virtual returns (uint) {
+        return 17280;
     }
 
     function transfer(address recipient, uint256 amount) public override returns (bool) {
@@ -90,7 +92,7 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function confirmNewRecoveringAddress(address newRecoveryAddress) public{
-        require(pendingRecoveringAddressChange[msg.sender].blockNumber + ALERT_BLOCK_WAIT <= block.number, "recovering address change not ready");
+        require(pendingRecoveringAddressChange[msg.sender].blockNumber + ALERT_BLOCK_WAIT() <= block.number, "recovering address change not ready");
         require(pendingRecoveringAddressChange[msg.sender].newCancelAccount == newRecoveryAddress, "no pending recovering address change for this address");
         recoveringAddresses[msg.sender] = newRecoveryAddress;
         delete pendingRecoveringAddressChange[msg.sender];
@@ -131,7 +133,7 @@ contract WBTCV is ERC20Burnable, Ownable
             Alert storage alert = incomingAlerts[addr][i];
             if(alert.recipient == address(0))
                 continue;
-            else if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
+            else if(alert.blockNumber + ALERT_BLOCK_WAIT() <= block.number)
                 j++;
         }
 
@@ -141,7 +143,7 @@ contract WBTCV is ERC20Burnable, Ownable
             Alert storage alert = incomingAlerts[addr][i];
             if(alert.recipient == address(0))
                 continue;
-            else if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
+            else if(alert.blockNumber + ALERT_BLOCK_WAIT() <= block.number)
             {
                 l_incomingAlerts[j] = alert;
                 j++;
@@ -158,7 +160,7 @@ contract WBTCV is ERC20Burnable, Ownable
             Alert storage alert = incomingAlerts[addr][i];
             if(alert.recipient == address(0))
                 continue;
-            else if(alert.blockNumber + ALERT_BLOCK_WAIT <= block.number)
+            else if(alert.blockNumber + ALERT_BLOCK_WAIT() <= block.number)
             {
                 _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
                 _transfer(alert.sender, alert.recipient, alert.amount);
