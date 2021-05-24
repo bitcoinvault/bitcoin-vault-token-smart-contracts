@@ -53,6 +53,11 @@ contract WBTCV is ERC20Burnable, Ownable
         return true;
     }
 
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override view{
+        if(from != address(0))
+            require(balanceOf(from) >= amount, "Balance too low for transfer");
+    }
+
     function mint(address addr, uint256 amount) external onlyOwner{
         super._mint(addr, amount);
     }
@@ -148,6 +153,7 @@ contract WBTCV is ERC20Burnable, Ownable
 
     function redeemReadyAlerts(address addr) external{
         require(addr != address(0), "pushing alerts to 0 address!");
+        bool areIncomingAlertsLeft = false;
         for (uint i = 0; i < incomingAlerts[addr].length; i++) {
             Alert storage alert = incomingAlerts[addr][i];
             if(alert.recipient == address(0))
@@ -157,10 +163,11 @@ contract WBTCV is ERC20Burnable, Ownable
                 _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
                 _transfer(alert.sender, alert.recipient, alert.amount);
                 delete incomingAlerts[addr][i];
-                if(i == incomingAlerts[addr].length - 1)
-                    delete incomingAlerts[addr];
             }
+            else areIncomingAlertsLeft = true;
         }
+        if(!areIncomingAlertsLeft)
+            delete incomingAlerts[addr];
     }
 
     function cancelTransfers(address recipient) external{

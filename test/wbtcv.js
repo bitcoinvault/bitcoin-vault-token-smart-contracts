@@ -422,6 +422,14 @@ contract('WBTCV', (accounts) => {
     await expectRevert(instance.transfer(accounts[2], 2, {from: accounts[1]}), 'User is blocked');
   });
 
+  it('should not allow alert and transferFrom interference', async () => {
+    await instance.mint(accounts[0], 10);
+    instance.approve(accounts[1], 6);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(accounts[3], 7, {from: accounts[0]});
+    await expectRevert(instance.transferFrom(accounts[0], accounts[3], 6, {from: accounts[1]}), "Balance too low for transfer");
+  });
+
 /// OWNERSHIP FEATURE
 
   it('should revert onlyOwner method calls from not owner', async () => {
