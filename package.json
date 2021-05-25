@@ -1,0 +1,28 @@
+{
+  "name": "bitcoin-vault-token-smart-contracts",
+  "version": "1.0.0",
+  "description": "* `npm install -g truffle` * `npm install @openzeppelin/contracts` # Compilation * `truffle compile` # Test * Build or download Ganache (see `https://www.trufflesuite.com/ganache`) * Run Ganache app * `truffle test` * In case test environment cannot connect to test node, check `networks.development.port` value with port used by Ganache (7545?)",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.1.0",
+    "@openzeppelin/test-helpers": "^0.5.11",
+    "truffle": "^5.3.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitcoinvault/bitcoin-vault-token-smart-contracts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bitcoinvault/bitcoin-vault-token-smart-contracts/issues"
+  },
+  "homepage": "https://github.com/bitcoinvault/bitcoin-vault-token-smart-contracts#readme"
+}
