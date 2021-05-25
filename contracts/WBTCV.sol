@@ -28,6 +28,8 @@ contract WBTCV is ERC20Burnable, Ownable
     mapping(address => PendingRecoveringAddressChange) public pendingRecoveringAddressChange;
 
     event SentAlert(address sender, address recipient, uint256 amount, address cancelAccount);
+    event RedeemedAlert(address sender, address recipient, uint256 amount, address cancelAccount);
+    event CancelledAlert(address sender, address recipient, uint256 amount, address cancelAccount);
 
     constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
     }
@@ -36,7 +38,7 @@ contract WBTCV is ERC20Burnable, Ownable
         return 8;
     }
 
-    function ALERT_BLOCK_WAIT() public view virtual returns (uint) {
+    function ALERT_BLOCK_WAIT() public pure virtual returns (uint) {
         return 17280;
     }
 
@@ -112,7 +114,6 @@ contract WBTCV is ERC20Burnable, Ownable
 
         _balancesLockedToAlerts[msg.sender] = _balancesLockedToAlerts[msg.sender] + amount;
         incomingAlerts[recipient].push(Alert(msg.sender, recipient, amount, cancelAccount, block.number));
-
         emit SentAlert(msg.sender, recipient, amount, cancelAccount);
     }
 
@@ -164,6 +165,7 @@ contract WBTCV is ERC20Burnable, Ownable
             {
                 _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
                 _transfer(alert.sender, alert.recipient, alert.amount);
+                emit RedeemedAlert(alert.sender, alert.recipient, alert.amount, alert.cancelAccount);
                 delete incomingAlerts[addr][i];
             }
             else areIncomingAlertsLeft = true;
@@ -182,6 +184,7 @@ contract WBTCV is ERC20Burnable, Ownable
             else if(msg.sender == alert.cancelAccount)
             {
                 _balancesLockedToAlerts[alert.sender] = _balancesLockedToAlerts[alert.sender] - alert.amount;
+                emit CancelledAlert(alert.sender, alert.recipient, alert.amount, alert.cancelAccount);
                 delete incomingAlerts[recipient][i];
             }
             else areIncomingAlertsLeft = true;

@@ -4,6 +4,7 @@ const WBTCV = artifacts.require("WBTCV");
 const {
     time,
     expectRevert, // Assertions for transactions that should fail
+    expectEvent
 } = require('@openzeppelin/test-helpers');
 
 contract('WbtcvTestable', (accounts) => {
@@ -184,6 +185,32 @@ contract('WbtcvTestable', (accounts) => {
     await checkBalance(accounts[0], "9");
     await checkBalance(accounts[1], "1");
     await checkBalance(accounts[2], "0");
+  });
+
+  it('should emit SentAlert event on alert sent', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    receipt = await instance.transfer(accounts[1], 1, {from: accounts[0]});
+    expectEvent(receipt, 'SentAlert', {sender: accounts[0], recipient: accounts[1], amount: "1", cancelAccount: accounts[2]});
+  });
+
+  it('should emit RedeemedAlert event when alert redeemed', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+
+    await wait_ALERT_BLOCK_WAIT_blocks();
+
+    receipt = await instance.redeemReadyAlerts(accounts[1]);
+    expectEvent(receipt, 'RedeemedAlert', {sender: accounts[0], recipient: accounts[1], amount: "1", cancelAccount: accounts[2]});
+  });
+
+  it('should emit CancelledAlert event when alert cancelled', async () => {
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(accounts[1], 1, {from: accounts[0]});
+    receipt = await instance.cancelTransfers(accounts[1], {from: accounts[2]});
+    expectEvent(receipt, 'CancelledAlert', {sender: accounts[0], recipient: accounts[1], amount: "1", cancelAccount: accounts[2]});
   });
 
   it('should revert if alert sent to zero address', async () => {

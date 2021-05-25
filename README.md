@@ -33,7 +33,7 @@ Wrapped Bitcoin Vault is a tokenised form of BTCV cryptocurrency to use with Bin
 
 ### Cancelling Secure Transfer
 * Send Secure Transfer (see above)
-* Before Secure Transfer is redeemed, call `cancelTransfers(<recipient>)`
+* Before Secure Transfer is redeemed, call `cancelTransfers(<recipient>)` from recovering account
 * All Secure Transfers from sender to recipient address that were not redeemed will be cancelled
 
 ### Setting Secure Transfer account to standard account
