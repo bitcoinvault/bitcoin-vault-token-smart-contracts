@@ -51,6 +51,14 @@ contract WBTCV is ERC20Burnable, Ownable
         return true;
     }
 
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+        require(!blocked[msg.sender], 'User is blocked');
+        require(!blocked[sender], 'User is blocked');
+        if(address(0) != recoveringAddresses[sender])
+            revert("transferFrom and allowances not available for wBTCV secure accounts");
+        else return super.transferFrom(sender, recipient, amount);
+    }
+
     function approve(address spender, uint256 amount) public override returns (bool) {
         require(!blocked[msg.sender], 'User is blocked');
         _approve(_msgSender(), spender, amount);
@@ -68,6 +76,10 @@ contract WBTCV is ERC20Burnable, Ownable
 
     function burn(uint256 amount) public override onlyOwner{
         super.burn(amount);
+    }
+
+    function burnFrom(address account, uint256 amount) public override onlyOwner{
+        revert("burnFrom method disabled");
     }
 
     function blockUser(address userAddress) external onlyOwner{

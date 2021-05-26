@@ -24,6 +24,11 @@ contract('WbtcvTestable', (accounts) => {
             await time.advanceBlock();
     }
 
+    async function wait_n_blocks(n){
+        for(i = 0; i < n; i++)
+            await time.advanceBlock();
+    }
+
 /// TOKEN FEATURES
 
   it('should have wBTCV name and 8 decimals precision', async () => {
@@ -235,16 +240,14 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    for(i = 0; i < 12; i++)
-        await time.advanceBlock();
+    await wait_n_blocks((await instance.ALERT_BLOCK_WAIT())/2);
 
     await instance.transfer(accounts[1], 2, {from: accounts[0]});
     await checkBalance(accounts[0], "7");
     await checkBalance(accounts[1], "0");
     await checkBalance(accounts[2], "0");
 
-    for(i = 0; i < 12; i++)
-        await time.advanceBlock();
+    await wait_n_blocks((await instance.ALERT_BLOCK_WAIT())/2);
 
     await instance.redeemReadyAlerts(accounts[1]);
     await checkBalance(accounts[0], "7");
@@ -282,7 +285,8 @@ contract('WbtcvTestable', (accounts) => {
     assert.equal(incomingAlerts[0].recipient, accounts[1], "ready alerts");
     assert.equal(incomingAlerts[0].amount, 1, "ready alerts");
     assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "ready alerts");
-    assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(24), "ready alerts");
+    expectedBlockNumber =  web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(await instance.ALERT_BLOCK_WAIT());
+    assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), expectedBlockNumber, "ready alerts");
   });
 
   it('should clean incoming alerts after ready alerts pushed', async () => {
@@ -423,7 +427,18 @@ contract('WbtcvTestable', (accounts) => {
     instance.approve(accounts[1], 6);
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[3], 7, {from: accounts[0]});
-    await expectRevert(instance.transferFrom(accounts[0], accounts[3], 6, {from: accounts[1]}), "Balance too low for transfer");
+    await expectRevert(instance.transferFrom(accounts[0], accounts[3], 6, {from: accounts[1]}), "transferFrom and allowances not available for wBTCV secure accounts");
+    await wait_ALERT_BLOCK_WAIT_blocks();
+    await instance.redeemReadyAlerts(accounts[3]);
+    await checkBalance(accounts[0], "3");
+    await checkBalance(accounts[3], "7");
+  });
+
+  it('should revert transferFrom for secure account', async () => {
+    await instance.mint(accounts[0], 10);
+    instance.approve(accounts[1], 6);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await expectRevert(instance.transferFrom(accounts[0], accounts[3], 6, {from: accounts[1]}), "transferFrom and allowances not available for wBTCV secure accounts");
   });
 
 /// OWNERSHIP FEATURE
