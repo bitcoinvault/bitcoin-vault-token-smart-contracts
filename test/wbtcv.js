@@ -19,8 +19,8 @@ contract('WbtcvTestable', (accounts) => {
         assert.equal(web3.utils.toHex(balance.valueOf()), web3.utils.toHex(expectedBalance), "Incorrect balance, expected " + address + " to be " + expectedBalance);
     }
 
-    async function wait_ALERT_BLOCK_WAIT_blocks(){
-        for(i = 0; i < await instance.ALERT_BLOCK_WAIT(); i++)
+    async function wait_alertBlockWait_blocks(){
+        for(i = 0; i < await instance.alertBlockWait(); i++)
             await time.advanceBlock();
     }
 
@@ -39,7 +39,7 @@ contract('WbtcvTestable', (accounts) => {
 
   it('should wait 17280 blocks for alert transaction', async () => {
     instance = await WBTCV.new();
-    assert.equal(await instance.ALERT_BLOCK_WAIT(), 17280, "ALERT_BLOCK_WAIT should be 17280 for WBTCV");
+    assert.equal(await instance.alertBlockWait(), 17280, "alertBlockWait should be 17280 for WBTCV");
   });
 
   it('should have 0 coins as initial amount', async () => {
@@ -49,6 +49,11 @@ contract('WbtcvTestable', (accounts) => {
   it('should increase value after mint', async () => {
     await instance.mint(accounts[0], 20);
     await checkBalance(accounts[0], "20");
+  });
+
+  it('should not exceed wbtcv supply', async () => {
+    await instance.mint(accounts[0], 20000000*1e8);
+    await expectRevert(instance.mint(accounts[0], 20000000*1e8), "BTCV supply exceeded");
   });
 
   it('should decrease value after burn', async () => {
@@ -127,7 +132,7 @@ contract('WbtcvTestable', (accounts) => {
         "new recovering address should not be 0 (use deleteRecoveringAddress?)");
   });
 
-  it('should not confirm recovery address before ALERT_BLOCK_WAIT blocks', async () => {
+  it('should not confirm recovery address before alertBlockWait blocks', async () => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.setNewRecoveringAddress(accounts[3], {from: accounts[0]});
@@ -136,40 +141,40 @@ contract('WbtcvTestable', (accounts) => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
   });
 
-  it('should confirm recovery address after ALERT_BLOCK_WAIT blocks', async () => {
+  it('should confirm recovery address after alertBlockWait blocks', async () => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.setNewRecoveringAddress(accounts[3], {from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     await instance.confirmNewRecoveringAddress(accounts[3]);
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[3]);
   });
 
-  it('should reject change recovery address after ALERT_BLOCK_WAIT blocks for invalid address', async () => {
+  it('should reject change recovery address after alertBlockWait blocks for invalid address', async () => {
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.setNewRecoveringAddress(accounts[3], {from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     await expectRevert(instance.confirmNewRecoveringAddress(accounts[2]), "no pending recovering address change for this address");
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
   });
 
-  it('should delete recovery address after ALERT_BLOCK_WAIT blocks', async () => {
+  it('should delete recovery address after alertBlockWait blocks', async () => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
     await instance.deleteRecoveringAddress({from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     await instance.confirmDeleteRecoveringAddress();
     assert.equal(await instance.recoveringAddresses(accounts[0]), "0x0000000000000000000000000000000000000000");
   });
 
-  it('should not delete recovery address before ALERT_BLOCK_WAIT blocks', async () => {
+  it('should not delete recovery address before alertBlockWait blocks', async () => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     assert.equal(await instance.recoveringAddresses(accounts[0]), accounts[2]);
     await instance.deleteRecoveringAddress({from: accounts[0]});
@@ -184,7 +189,7 @@ contract('WbtcvTestable', (accounts) => {
     await checkBalance(accounts[1], "0");
     await checkBalance(accounts[2], "0");
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     await instance.redeemReadyAlerts(accounts[1]);
     await checkBalance(accounts[0], "9");
@@ -204,7 +209,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     receipt = await instance.redeemReadyAlerts(accounts[1]);
     expectEvent(receipt, 'RedeemedAlert', {sender: accounts[0], recipient: accounts[1], amount: "1", cancelAccount: accounts[2]});
@@ -240,14 +245,14 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    await wait_n_blocks((await instance.ALERT_BLOCK_WAIT())/2);
+    await wait_n_blocks((await instance.alertBlockWait())/2);
 
     await instance.transfer(accounts[1], 2, {from: accounts[0]});
     await checkBalance(accounts[0], "7");
     await checkBalance(accounts[1], "0");
     await checkBalance(accounts[2], "0");
 
-    await wait_n_blocks((await instance.ALERT_BLOCK_WAIT())/2);
+    await wait_n_blocks((await instance.alertBlockWait())/2);
 
     await instance.redeemReadyAlerts(accounts[1]);
     await checkBalance(accounts[0], "7");
@@ -277,7 +282,7 @@ contract('WbtcvTestable', (accounts) => {
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 0");
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 1, "ready alerts length not 1");
@@ -285,7 +290,7 @@ contract('WbtcvTestable', (accounts) => {
     assert.equal(incomingAlerts[0].recipient, accounts[1], "ready alerts");
     assert.equal(incomingAlerts[0].amount, 1, "ready alerts");
     assert.equal(incomingAlerts[0].cancelAccount, accounts[2], "ready alerts");
-    expectedBlockNumber =  web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(await instance.ALERT_BLOCK_WAIT());
+    expectedBlockNumber =  web3.utils.toHex(await time.latestBlock().valueOf()) - web3.utils.toHex(await instance.alertBlockWait());
     assert.equal(web3.utils.toHex(incomingAlerts[0].blockNumber), expectedBlockNumber, "ready alerts");
   });
 
@@ -294,7 +299,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     incomingAlerts = await instance.redeemReadyAlerts(accounts[1]);
     incomingAlerts = await instance.getIncomingAlerts(accounts[1]);
@@ -306,7 +311,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     incomingAlerts = await instance.redeemReadyAlerts(accounts[1]);
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
@@ -318,7 +323,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.deleteRecoveringAddress({from: accounts[0]});
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     await instance.confirmDeleteRecoveringAddress();
     await instance.transfer(accounts[1], 1, {from: accounts[0]});
@@ -356,7 +361,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.cancelTransfers(accounts[1], {from: accounts[2]})
     await instance.cancelTransfers(accounts[1], {from: accounts[0]})
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 0, "ready alerts length not 1");
@@ -383,7 +388,7 @@ contract('WbtcvTestable', (accounts) => {
     await checkBalance(accounts[1], "0");
     await checkBalance(accounts[2], "7");
 
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
 
     incomingAlerts = await instance.getReadyAlerts(accounts[1]);
     assert.equal(incomingAlerts.length, 2, "ready alerts length not 1");
@@ -428,7 +433,7 @@ contract('WbtcvTestable', (accounts) => {
     await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
     await instance.transfer(accounts[3], 7, {from: accounts[0]});
     await expectRevert(instance.transferFrom(accounts[0], accounts[3], 6, {from: accounts[1]}), "transferFrom and allowances not available for wBTCV secure accounts");
-    await wait_ALERT_BLOCK_WAIT_blocks();
+    await wait_alertBlockWait_blocks();
     await instance.redeemReadyAlerts(accounts[3]);
     await checkBalance(accounts[0], "3");
     await checkBalance(accounts[3], "7");
