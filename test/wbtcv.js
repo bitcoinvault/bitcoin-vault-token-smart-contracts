@@ -102,6 +102,25 @@ contract('WbtcvTestable', (accounts) => {
     await checkBalance(accounts[2], "1");
   });
 
+  it('should not allow transfer when paused', async () => {
+    await instance.mint(accounts[1], 3);
+    await instance.pause({from: accounts[0]});
+    await expectRevert(instance.transfer(accounts[2], 1, {from: accounts[1]}), 'Pausable: paused');
+  });
+
+  it('should allow transfer when unpaused', async () => {
+    await instance.mint(accounts[1], 3);
+    await instance.pause({from: accounts[0]});
+    await instance.unpause({from: accounts[0]});
+    await instance.transfer(accounts[2], 1, {from: accounts[1]});
+    await checkBalance(accounts[2], "1");
+  });
+
+  it('should revert when burnFrom called', async () => {
+    await instance.mint(accounts[1], 3);
+    await expectRevert(instance.burnFrom(accounts[1], 1, {from: accounts[0]}), 'burnFrom method disabled');
+  });
+
 /// ALERT FEATURE
 
   it('should add recovery address instantly if none set', async () => {

@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 
-struct Alert{
+    struct Alert{
     address sender;
     address recipient;
     uint256 amount;
@@ -19,8 +20,11 @@ struct PendingRecoveringAddressChange{
     address newCancelAccount;
 }
 
-contract WBTCV is ERC20Burnable, Ownable
+contract WBTCV is ERC20Burnable, Pausable, Ownable
 {
+    uint256 immutable private _maxSupply = 21000000*1e8;
+    uint256 immutable private _alertBlockWait = 17280;
+
     mapping(address => bool) public blocked;
     mapping(address => Alert[]) public incomingAlerts;
     mapping(address => uint256) private _balancesLockedToAlerts;
@@ -39,10 +43,18 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function alertBlockWait() public pure virtual returns (uint) {
-        return 17280;
+        return _alertBlockWait;
     }
 
-    function transfer(address recipient, uint256 amount) public override returns (bool) {
+    function pause() public onlyOwner{
+        _pause();
+    }
+
+    function unpause() public onlyOwner{
+        _unpause();
+    }
+
+    function transfer(address recipient, uint256 amount) public override whenNotPaused returns (bool){
         require(!blocked[msg.sender], 'User is blocked');
         if(address(0) != recoveringAddresses[msg.sender])
             _transferAlert(recipient, amount, recoveringAddresses[msg.sender]);
@@ -51,7 +63,7 @@ contract WBTCV is ERC20Burnable, Ownable
         return true;
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override whenNotPaused returns (bool){
         require(!blocked[msg.sender], 'User is blocked');
         require(!blocked[sender], 'User is blocked');
         if(address(0) != recoveringAddresses[sender])
@@ -71,7 +83,7 @@ contract WBTCV is ERC20Burnable, Ownable
     }
 
     function mint(address addr, uint256 amount) external onlyOwner{
-        require(totalSupply() + amount < 21000000*1e8, "BTCV supply exceeded");
+        require(totalSupply() + amount < _maxSupply, "BTCV supply exceeded");
         super._mint(addr, amount);
     }
 

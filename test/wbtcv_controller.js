@@ -178,4 +178,24 @@ contract('WbtcvController', (accounts) => {
       assert.equal(await wbtcv.owner.call(), wbtcv_controller.address);
       await expectRevert(wbtcv_controller.transferOwnership("0x0000000000000000000000000000000000000000", {from: accounts[8]}), "Ownable: new owner is the zero address");
   });
+
+  it('should forward pauseToken to token', async () => {
+      await wbtcv_controller.pauseToken();
+      assert.equal(await wbtcv.paused(), true, "token not paused");
+  });
+
+  it('should forward unpauseToken to token', async () => {
+      await wbtcv_controller.pauseToken();
+      await wbtcv_controller.unpauseToken();
+      assert.equal(await wbtcv.paused(), false, "unpaused token still paused");
+  });
+
+  it('should not pause if not signer', async () => {
+      await expectRevert(wbtcv_controller.pauseToken({from: accounts[1]}), "Feature is only available for approved signers");
+  });
+
+  it('should not unpause if not signer', async () => {
+      await wbtcv_controller.pauseToken();
+      await expectRevert(wbtcv_controller.unpauseToken({from: accounts[1]}), "Feature is only available for approved signers");
+  });
 });

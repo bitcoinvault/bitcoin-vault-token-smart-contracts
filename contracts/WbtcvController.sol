@@ -47,10 +47,6 @@ contract WbtcvController {
         return pendingMints.length;
     }
 
-    function getBurnsCount() external view returns (uint){
-        return pendingBurns.length;
-    }
-
     function _isMintSignatureCorrect(address addr, uint256 amount) private view returns (bool){
         for(uint i = 0; i < pendingMints.length; i++){
             if(addr == pendingMints[i].addr && amount == pendingMints[i].amount && msg.sender != pendingMints[i].addressSigned){
@@ -71,6 +67,10 @@ contract WbtcvController {
     function burn(uint256 amount) external onlySigner{
         require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
         pendingBurns.push(PendingBurn(amount, msg.sender));
+    }
+
+    function getBurnsCount() external view returns (uint){
+        return pendingBurns.length;
     }
 
     function _isBurnSignatureCorrect(uint256 amount) private view returns(bool){
@@ -118,5 +118,13 @@ contract WbtcvController {
             _ownedContract.transferOwnership(newOwner);
         }
         else revert("Ownership transfer proposal not present");
+    }
+
+    function pauseToken() external onlySigner{
+        _ownedContract.pause();
+    }
+
+    function unpauseToken() external onlySigner{
+        _ownedContract.unpause();
     }
 }
