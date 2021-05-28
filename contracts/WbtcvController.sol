@@ -21,7 +21,7 @@ struct PendingOwnershipChange{
 }
 
 contract WbtcvController {
-    WBTCV private _ownedContract;
+    WBTCV public ownedContract;
     mapping(address => bool) private _signers;
     PendingMint[] public pendingMints;
     PendingBurn[] public pendingBurns;
@@ -32,11 +32,11 @@ contract WbtcvController {
         _;
     }
 
-    constructor(WBTCV ownedContract, address[] memory signers){
+    constructor(WBTCV p_ownedContract, address[] memory signers){
         require(3 == signers.length, "There should be 3 signers");
         for(uint i = 0; i < 3; i++)
             _signers[signers[i]] = true;
-        _ownedContract = ownedContract;
+        ownedContract = p_ownedContract;
     }
 
     function mint(address addr, uint256 amount) external onlySigner{
@@ -59,13 +59,13 @@ contract WbtcvController {
     function signMint(address addr, uint256 amount) external onlySigner{
         if(_isMintSignatureCorrect(addr, amount)){
             delete pendingMints;
-            _ownedContract.mint(addr, amount);
+            ownedContract.mint(addr, amount);
         }
         else revert("Mint proposal not present");
     }
 
     function burn(uint256 amount) external onlySigner{
-        require(_ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
+        require(ownedContract.balanceOf(address(this)) >= amount, "Not enough funds to burn!");
         pendingBurns.push(PendingBurn(amount, msg.sender));
     }
 
@@ -85,17 +85,17 @@ contract WbtcvController {
     function signBurn(uint256 amount) external onlySigner{
         if(_isBurnSignatureCorrect(amount)){
             delete pendingBurns;
-            _ownedContract.burn(amount);
+            ownedContract.burn(amount);
         }
         else revert("Burn proposal not present");
     }
 
     function blockUser(address userAddress) external onlySigner{
-        _ownedContract.blockUser(userAddress);
+        ownedContract.blockUser(userAddress);
     }
 
     function unblockUser(address userAddress) external onlySigner{
-        _ownedContract.unblockUser(userAddress);
+        ownedContract.unblockUser(userAddress);
     }
 
     function transferOwnership(address newOwner) external onlySigner{
@@ -115,16 +115,16 @@ contract WbtcvController {
     function signTransferOwnership(address newOwner) external onlySigner{
         if(_isOwnershipTransferSignatureCorrect(newOwner)){
             delete pendingOwnershipChanges;
-            _ownedContract.transferOwnership(newOwner);
+            ownedContract.transferOwnership(newOwner);
         }
         else revert("Ownership transfer proposal not present");
     }
 
     function pauseToken() external onlySigner{
-        _ownedContract.pause();
+        ownedContract.pause();
     }
 
     function unpauseToken() external onlySigner{
-        _ownedContract.unpause();
+        ownedContract.unpause();
     }
 }
