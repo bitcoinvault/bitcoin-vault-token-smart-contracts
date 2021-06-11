@@ -37,9 +37,9 @@ contract('WbtcvTestable', (accounts) => {
     assert.equal(await instance.decimals(), 8, "decimal precision should be 8")
   });
 
-  it('should wait 17280 blocks for alert transaction', async () => {
+  it('should wait 28800 blocks for alert transaction', async () => {
     instance = await WBTCV.new();
-    assert.equal(await instance.alertBlockWait(), 17280, "alertBlockWait should be 17280 for WBTCV");
+    assert.equal(await instance.alertBlockWait(), 28800, "alertBlockWait should be 28800 for WBTCV");
   });
 
   it('should have 0 coins as initial amount', async () => {
@@ -56,11 +56,13 @@ contract('WbtcvTestable', (accounts) => {
     await expectRevert(instance.mint(accounts[0], 20000000*1e8), "BTCV supply exceeded");
   });
 
-  it('should decrease value after burn', async () => {
+ it('should burn if sent to burn address', async() => {
     await instance.mint(accounts[0], 20);
-    await instance.burn(10);
-    await checkBalance(accounts[0], "10");
-  });
+    burnAddress = "0x00000000000000000000000000000000FfFFffF0";
+    await instance.transfer(burnAddress, 3);
+    await checkBalance(accounts[0], "17");
+    await checkBalance(burnAddress, "0");
+ })
 
   it('should perform succesful transfer', async () => {
     await instance.mint(accounts[0], 20);
@@ -75,6 +77,8 @@ contract('WbtcvTestable', (accounts) => {
     await instance.mint(accounts[1], 3);
     await instance.blockUser(accounts[1])
     await expectRevert(instance.transfer(accounts[2], 2, {from: accounts[1]}), 'User is blocked');
+    await expectRevert(instance.transferFrom(accounts[0], accounts[2], 2, {from: accounts[1]}), 'User is blocked');
+    await expectRevert(instance.transferFrom(accounts[1], accounts[2], 2, {from: accounts[0]}), 'User is blocked');
   });
 
   it('should allow unblocked user to make transfer', async () => {
@@ -114,6 +118,11 @@ contract('WbtcvTestable', (accounts) => {
     await instance.unpause({from: accounts[0]});
     await instance.transfer(accounts[2], 1, {from: accounts[1]});
     await checkBalance(accounts[2], "1");
+  });
+
+  it('should revert when burn called', async () => {
+    await instance.mint(accounts[1], 3);
+    await expectRevert(instance.burn(1, {from: accounts[1]}), 'burn method disabled');
   });
 
   it('should revert when burnFrom called', async () => {
@@ -213,6 +222,23 @@ contract('WbtcvTestable', (accounts) => {
     await instance.redeemReadyAlerts(accounts[1]);
     await checkBalance(accounts[0], "9");
     await checkBalance(accounts[1], "1");
+    await checkBalance(accounts[2], "0");
+  });
+
+  it('should perform succesful burn with alert', async () => {
+    burnAddress = "0x00000000000000000000000000000000FfFFffF0";
+    await instance.mint(accounts[0], 10);
+    await instance.setNewRecoveringAddress(accounts[2], {from: accounts[0]});
+    await instance.transfer(burnAddress, 1, {from: accounts[0]});
+    await checkBalance(accounts[0], "9");
+    await checkBalance(burnAddress, "0");
+    await checkBalance(accounts[2], "0");
+
+    await wait_alertBlockWait_blocks();
+
+    await instance.redeemReadyAlerts(accounts[1]);
+    await checkBalance(accounts[0], "9");
+    await checkBalance(burnAddress, "0");
     await checkBalance(accounts[2], "0");
   });
 

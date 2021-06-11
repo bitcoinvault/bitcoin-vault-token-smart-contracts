@@ -7,23 +7,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 
-    struct Alert{
-    address sender;
-    address recipient;
-    uint256 amount;
-    address cancelAccount;
-    uint blockNumber;
-}
-
-struct PendingRecoveringAddressChange{
-    uint blockNumber;
-    address newCancelAccount;
-}
-
 contract WBTCV is ERC20Burnable, Pausable, Ownable
 {
+    struct Alert{
+        address sender;
+        address recipient;
+        uint256 amount;
+        address cancelAccount;
+        uint blockNumber;
+    }
+
+    struct PendingRecoveringAddressChange{
+        uint blockNumber;
+        address newCancelAccount;
+    }
+
     uint256 immutable private _maxSupply = 21000000*1e8;
-    uint256 immutable private _alertBlockWait = 17280;
+    uint256 immutable private _alertBlockWait = 28800;
+    address immutable private _lastBurnAddress = 0x00000000000000000000000000000000FFFFfFFF;
 
     mapping(address => bool) public blocked;
     mapping(address => Alert[]) public incomingAlerts;
@@ -34,6 +35,7 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
     event SentAlert(address sender, address recipient, uint256 amount, address cancelAccount);
     event RedeemedAlert(address sender, address recipient, uint256 amount, address cancelAccount);
     event CancelledAlert(address sender, address recipient, uint256 amount, address cancelAccount);
+    event Burn(address indexed from, uint256 value);
 
     constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
     }
@@ -54,6 +56,12 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
         _unpause();
     }
 
+    function isBurnAddress(address addr) public view returns (bool){
+        if(addr < _lastBurnAddress)
+            return true;
+        else return false;
+    }
+
     function transfer(address recipient, uint256 amount) public override whenNotPaused returns (bool){
         require(!blocked[msg.sender], 'User is blocked');
         if(address(0) != recoveringAddresses[msg.sender])
@@ -61,6 +69,14 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
         else
             _transfer(_msgSender(), recipient, amount);
         return true;
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount) internal override{
+        if(isBurnAddress(recipient)){
+            burnAddressTransfer(amount);
+            return;
+        }
+        super._transfer(sender, recipient, amount);
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override whenNotPaused returns (bool){
@@ -77,18 +93,18 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
         return true;
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override view{
-        if(from != address(0))
-            require(balanceOf(from) >= amount, "Balance too low for transfer");
-    }
-
     function mint(address addr, uint256 amount) external onlyOwner{
         require(totalSupply() + amount < _maxSupply, "BTCV supply exceeded");
         super._mint(addr, amount);
     }
 
-    function burn(uint256 amount) public override onlyOwner{
+    function burnAddressTransfer(uint256 amount) private{
+        emit Burn(msg.sender, amount);
         super.burn(amount);
+    }
+
+    function burn(uint256 amount) public override{
+        revert("burn method disabled");
     }
 
     function burnFrom(address account, uint256 amount) public override onlyOwner{
