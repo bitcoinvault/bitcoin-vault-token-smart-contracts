@@ -24,7 +24,7 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
 
     uint256 immutable private _maxSupply = 21000000*1e8;
     uint256 immutable private _alertBlockWait = 28800;
-    address immutable private _lastBurnAddress = 0x00000000000000000000000000000000FFFFfFFF;
+    address immutable private _lastBurnAddress = 0x0000000000000000000000000000fFfffFFfFfff;
 
     mapping(address => bool) public blocked;
     mapping(address => Alert[]) public incomingAlerts;
