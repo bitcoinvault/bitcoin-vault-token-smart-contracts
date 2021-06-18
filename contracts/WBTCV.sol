@@ -35,7 +35,7 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
     event SentAlert(address sender, address recipient, uint256 amount, address cancelAccount);
     event RedeemedAlert(address sender, address recipient, uint256 amount, address cancelAccount);
     event CancelledAlert(address sender, address recipient, uint256 amount, address cancelAccount);
-    event Burn(address indexed from, uint256 value);
+    event Burn(address indexed from, address indexed to, uint256 value);
 
     constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
     }
@@ -73,7 +73,8 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
 
     function _transfer(address sender, address recipient, uint256 amount) internal override{
         if(isBurnAddress(recipient)){
-            burnAddressTransfer(amount);
+            emit Burn(sender, recipient, amount);
+            super.burn(amount);
             return;
         }
         super._transfer(sender, recipient, amount);
@@ -96,11 +97,6 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
     function mint(address addr, uint256 amount) external onlyOwner{
         require(totalSupply() + amount < _maxSupply, "BTCV supply exceeded");
         super._mint(addr, amount);
-    }
-
-    function burnAddressTransfer(uint256 amount) private{
-        emit Burn(msg.sender, amount);
-        super.burn(amount);
     }
 
     function burn(uint256 amount) public override{
