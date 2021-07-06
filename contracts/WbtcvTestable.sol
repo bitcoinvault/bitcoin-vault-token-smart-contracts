@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.6;
 import "./WBTCV.sol";
 
 contract WbtcvTestable is WBTCV{
 
-    function ALERT_BLOCK_WAIT() public pure override returns (uint) {
-        return 24;
+    function alertBlockWait() public pure override returns (uint) {
+        return 4;
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -14,11 +14,11 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
         address recipient;
         uint256 amount;
         address cancelAccount;
-        uint blockNumber;
+        uint256 blockNumber;
     }
 
     struct PendingRecoveringAddressChange{
-        uint blockNumber;
+        uint256 blockNumber;
         address newCancelAccount;
     }
 
@@ -40,7 +40,7 @@ contract WBTCV is ERC20Burnable, Pausable, Ownable
     constructor() ERC20("Wrapped Bitcoin Vault", "wBTCV") {
     }
 
-    function decimals() public view override returns (uint8) {
+    function decimals() public pure override returns (uint8) {
         return 8;
     }
 
